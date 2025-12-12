@@ -6,23 +6,25 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
-        h1 { text-align: center; margin-bottom: 20px; }
+        h1 { text-align: center; margin-bottom: 10px; }
+        .alert-counter { text-align: center; font-size: 1.2em; margin-bottom: 20px; font-weight: bold; color: red; }
         .cards { display: flex; justify-content: center; gap: 20px; margin-bottom: 40px; flex-wrap: wrap; }
-        .card { background: #fff; padding: 20px; border-radius: 10px; width: 180px; text-align: center; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .card { background: #fff; padding: 20px; border-radius: 10px; width: 180px; text-align: center; box-shadow: 0 0 10px rgba(0,0,0,0.1); transition: 0.3s; }
         .card h2 { margin: 10px 0; font-size: 2em; }
         .chart-container { width: 80%; max-width: 800px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);}
     </style>
 </head>
 <body>
     <h1>IoT Monitoring System</h1>
+    <div class="alert-counter" id="alertCount">Current Alerts: 0</div>
 
     <!-- Latest Values Cards -->
     <div class="cards">
-        <div class="card">
+        <div class="card" id="tempCard">
             <h4>Temperature</h4>
             <h2 id="latestTemp">-- °C</h2>
         </div>
-        <div class="card">
+        <div class="card" id="humCard">
             <h4>Humidity</h4>
             <h2 id="latestHum">-- %</h2>
         </div>
@@ -37,24 +39,28 @@
     </div>
 
     <script>
-        // Your Google Sheet CSV link
         const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRygk6rsDcpdeupU698H9MvQxT9sN9G4QkQJ6UwfSRXUSY4M5vfcDGrQzbpiE0ZGL_zXPEToCoMyNut/pub?output=csv";
+
+        const tempMin = 20;
+        const tempMax = 38;
+        const humMin = 50;
+        const humMax = 80;
 
         let temperatureChart, humidityChart;
 
         async function fetchSheetData() {
             const response = await fetch(sheetURL);
             const data = await response.text();
-            const rows = data.split("\n").slice(1); // skip header
+            const rows = data.split("\n").slice(1);
 
             const time = [], temperature = [], humidity = [];
 
             rows.forEach(row => {
-                const cols = row.split(",");
-                if(cols.length >= 3 && cols[1] && cols[2]) {
-                    time.push(cols[0]);
-                    temperature.push(parseFloat(cols[1]));
-                    humidity.push(parseFloat(cols[2]));
+                const cols = row.split(",").map(col => col.trim());
+                if(cols.length >= 4 && cols[0] && cols[1] && cols[2] && cols[3]) {
+                    time.push(cols[0] + " " + cols[1]);
+                    temperature.push(parseFloat(cols[2]));
+                    humidity.push(parseFloat(cols[3]));
                 }
             });
 
@@ -63,12 +69,40 @@
 
         async function updateDashboard() {
             const data = await fetchSheetData();
+            if(data.temperature.length === 0) return;
+
+            const latestTemp = data.temperature[data.temperature.length-1];
+            const latestHum = data.humidity[data.humidity.length-1];
 
             // Update latest values
-            if(data.temperature.length > 0) document.getElementById('latestTemp').textContent = data.temperature[data.temperature.length-1] + " °C";
-            if(data.humidity.length > 0) document.getElementById('latestHum').textContent = data.humidity[data.humidity.length-1] + " %";
+            document.getElementById('latestTemp').textContent = latestTemp + " °C";
+            document.getElementById('latestHum').textContent = latestHum + " %";
 
-            // Destroy previous charts if exist
+            // Check alerts
+            let alertCount = 0;
+
+            // Temperature card
+            const tempCard = document.getElementById('tempCard');
+            if(latestTemp < tempMin || latestTemp > tempMax){
+                tempCard.style.backgroundColor = "#f8d7da"; // red
+                alertCount++;
+            } else {
+                tempCard.style.backgroundColor = "#d4edda"; // green
+            }
+
+            // Humidity card
+            const humCard = document.getElementById('humCard');
+            if(latestHum < humMin || latestHum > humMax){
+                humCard.style.backgroundColor = "#f8d7da"; // red
+                alertCount++;
+            } else {
+                humCard.style.backgroundColor = "#d4edda"; // green
+            }
+
+            // Update alert counter
+            document.getElementById('alertCount').textContent = "Current Alerts: " + alertCount;
+
+            // Destroy previous charts
             if(temperatureChart) temperatureChart.destroy();
             if(humidityChart) humidityChart.destroy();
 
@@ -117,3 +151,4 @@
     </script>
 </body>
 </html>
+
